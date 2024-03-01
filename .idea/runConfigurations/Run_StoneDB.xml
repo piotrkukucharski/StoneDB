@@ -4,6 +4,8 @@
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs>
       <env name="STONEDB_DATA" value="$PROJECT_DIR$/temporary/data" />
+      <env name="STONEDB_PORT" value="6663" />
+      <env name="STONEDB_ADDRESS" value="127.0.0.1" />
     </envs>
     <option name="emulateTerminal" value="true" />
     <option name="channel" value="DEFAULT" />
