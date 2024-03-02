@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run StoneDB" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="run --package StoneDB --bin StoneDB" />
-    <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+  <configuration default="false" name="run build-server" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+    <option name="command" value="run" />
+    <option name="workingDirectory" value="file://$PROJECT_DIR$/pkgs/server" />
     <envs>
       <env name="STONEDB_DATA" value="$PROJECT_DIR$/temporary/data" />
       <env name="STONEDB_PORT" value="6663" />
@@ -16,8 +16,6 @@
     <option name="backtrace" value="SHORT" />
     <option name="isRedirectInput" value="false" />
     <option name="redirectInputPath" value="" />
-    <method v="2">
-      <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
-    </method>
+    <method v="2" />
   </configuration>
 </component>

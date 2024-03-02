@@ -1,17 +1,19 @@
 [package]
-name = "StoneDB"
+name = "stonedb-server"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-avro-rs= { version = "0.13",features = ["snappy"] }
+avro-rs = { version = "0.13", features = ["snappy"] }
 config = "0.14.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 bytes = "1"
-uuid = {version = "1.7.0", features = ["v4","fast-rng"]}
+uuid = { version = "1.7.0", features = ["v4", "fast-rng"] }
 format-bytes = "0.3"
+log = { version = "0.4", features = ["kv", "serde"] }
+regex = "1"
 
 [dev-dependencies]
-cucumber="0.20.2"
+cucumber = "0.20.2"
