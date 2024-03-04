@@ -1,11 +1,16 @@
 use std::collections::HashMap;
 use std::{fs, io};
+use std::fs::OpenOptions;
+use std::io::Read;
 use std::path::{PathBuf};
+use avro_rs::{Codec, Reader, Schema, Writer};
+use avro_rs::types::Record;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use uuid::Uuid;
 use crate::clock::{ChronoUtcSystemClock, Clock};
 use base64::{Engine as _, engine::{general_purpose}};
+use log::kv::{Key, Source};
 
 
 type Stream = String;
@@ -122,6 +127,69 @@ impl Engine {
         }
         Ok(())
     }
+
+    pub fn write_event(&self, event: Event) -> Result<(), String> {
+        let file_path = self.configuration.data_path.join(format!("{}/{}/{}.avro", event.space, event.kind, event.stream));
+        let raw_schema = r#"
+    {
+        "type": "record",
+        "name": "event",
+        "fields": [
+            {"name": "stream", "type": "string"},
+            {"name": "event_id", "type": "string"},
+            {"name": "sequence", "type": "long"},
+            {"name": "recorded_at", "type": "long"},
+            {"name": "event_type", "type": "string"},
+            {"name": "payload", "type": "string"}
+        ]
+    }
+    "#;
+        let schema = Schema::parse_str(raw_schema).map_err(|e| e.to_string())?;
+
+        let mut events = Vec::new();
+        if let Ok(mut file) = OpenOptions::new().read(true).open(file_path.clone()) {
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+            let reader = Reader::with_schema(&schema, &buffer[..]).map_err(|e| e.to_string())?;
+
+            for value in reader {
+                let record = value.map_err(|e| e.to_string())?;
+                events.push(record);
+            }
+        }
+
+        if let Some(last) = events.last() {
+            let last_sequence = last.get(Key::from_str("sequence")).unwrap().as_long().unwrap();
+            if last_sequence >= event.sequence {
+                return Err("Sequence number is not greater than the last record".to_string());
+            }
+        }
+
+
+
+        let mut record = Record::new(&schema).map_err(|e| e.to_string())?;
+        record.put("stream", &event.stream);
+        record.put("event_id", &event.event_id);
+        record.put("sequence", event.sequence);
+        record.put("recorded_at", event.recorded_at);
+        record.put("event_type", &event.event_type);
+        record.put("payload", &event.payload);
+
+        events.push(record);
+
+        // @TODO Change codec to snappy
+        let mut writer = Writer::with_codec(&schema, Vec::new(), Codec::Null);
+        for event in events {
+            writer.append(event).map_err(|e| e.to_string())?;
+        }
+        writer.flush().map_err(|e| e.to_string())?;
+        let encoded_data = writer.into_inner().map_err(|e| e.to_string())?;
+
+        let mut file = OpenOptions::new().write(true).create(true).open(file_path).map_err(|e| e.to_string())?;
+        file.write_all(&encoded_data).map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -176,5 +244,4 @@ mod tests {
         fs::set_permissions(&tmp_dir_path, fs::Permissions::from_mode(0o755)).unwrap();
         fs::remove_dir_all(tmp_dir_path).unwrap();
     }
-
 }
