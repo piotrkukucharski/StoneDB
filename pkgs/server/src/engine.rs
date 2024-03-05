@@ -135,7 +135,6 @@ impl Engine {
         "type": "record",
         "name": "event",
         "fields": [
-            {"name": "stream", "type": "string"},
             {"name": "event_id", "type": "string"},
             {"name": "sequence", "type": "long"},
             {"name": "recorded_at", "type": "long"},
@@ -168,7 +167,6 @@ impl Engine {
 
 
         let mut record = Record::new(&schema).map_err(|e| e.to_string())?;
-        record.put("stream", &event.stream);
         record.put("event_id", &event.event_id);
         record.put("sequence", event.sequence);
         record.put("recorded_at", event.recorded_at);
