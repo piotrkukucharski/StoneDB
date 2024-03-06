@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::{fs, io};
 use std::fs::OpenOptions;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{PathBuf};
 use avro_rs::{Codec, Reader, Schema, Writer};
 use avro_rs::types::Record;
@@ -145,7 +145,7 @@ impl Engine {
     "#;
         let schema = Schema::parse_str(raw_schema).map_err(|e| e.to_string())?;
 
-        let mut events = Vec::new();
+        let mut events:Vec<Record> = Vec::new();
         if let Ok(mut file) = OpenOptions::new().read(true).open(file_path.clone()) {
             let mut buffer = Vec::new();
             file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
@@ -156,22 +156,21 @@ impl Engine {
                 events.push(record);
             }
         }
-
-        if let Some(last) = events.last() {
-            let last_sequence = last.get(Key::from_str("sequence")).unwrap().as_long().unwrap();
-            if last_sequence >= event.sequence {
-                return Err("Sequence number is not greater than the last record".to_string());
-            }
+        if events.len() > 0{
+            // if let Some(last) = events.last() {
+            //     let last_sequence = last.get(Key::from_str("sequence")).unwrap().as_long().unwrap();
+            //     if last_sequence >= event.sequence {
+            //         return Err("Sequence number is not greater than the last record".to_string());
+            //     }
+            // }
         }
 
-
-
-        let mut record = Record::new(&schema).map_err(|e| e.to_string())?;
-        record.put("event_id", &event.event_id);
-        record.put("sequence", event.sequence);
-        record.put("recorded_at", event.recorded_at);
-        record.put("event_type", &event.event_type);
-        record.put("payload", &event.payload);
+        let mut record:Record<> = Record::new(&schema)?;
+        record.put("event_id", &event.event_id.to_string()?);
+        record.put("sequence", event.sequence.to_string()?);
+        record.put("recorded_at", event.recorded_at.to_string()?);
+        record.put("event_type", &event.event_type.to_string()?);
+        record.put("payload", &event.payload.to_string()?);
 
         events.push(record);
 
@@ -193,8 +192,10 @@ impl Engine {
 mod tests {
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
+    use serde_json::{Map, Value};
     use tempdir::TempDir;
-    use crate::engine::{Engine, EngineConfiguration};
+    use uuid::Uuid;
+    use crate::engine::{Engine, EngineConfiguration, Event};
 
     #[test]
     fn test_init_engine_happy_path() {
@@ -242,4 +243,64 @@ mod tests {
         fs::set_permissions(&tmp_dir_path, fs::Permissions::from_mode(0o755)).unwrap();
         fs::remove_dir_all(tmp_dir_path).unwrap();
     }
+
+    #[test]
+    fn test_write_event_happy_path_add_one_event(){
+        let tmp_dir = TempDir::new("temp_dir_for_test_write_event").unwrap();
+        let tmp_dir_path = tmp_dir.into_path();
+        let space = "default".to_string();
+        let configuration = EngineConfiguration{
+            data_path: tmp_dir_path.clone(),
+            default_space: space.clone(),
+        };
+        let engine = Engine::new(configuration);
+        assert!(engine.is_ok());
+        let event = Event{
+            space: space,
+            kind: "order".to_string(),
+            stream: Uuid::new_v4().to_string(),
+            event_id: Uuid::new_v4().to_string(),
+            sequence: 0,
+            recorded_at: 0,
+            event_type: "init".to_string(),
+            payload: Value::Object(Map::new()),
+        };
+        engine.unwrap().write_event(event).unwrap()
+    }
+    // #[test]
+    // fn test_write_event_happy_path_add_many_events(){
+    //     let tmp_dir = TempDir::new("temp_dir_for_test_write_event").unwrap();
+    //     let tmp_dir_path = tmp_dir.into_path();
+    //     let space = "default".to_string();
+    //     let configuration = EngineConfiguration{
+    //         data_path: tmp_dir_path.clone(),
+    //         default_space: space.clone(),
+    //     };
+    //     let engine = Engine::new(configuration)?;
+    //     assert!(engine.is_ok());
+    //     let kind = "order".to_string();
+    //     let stream = Uuid::new_v4().to_string();
+    //     let event = Event{
+    //         space: space.clone(),
+    //         kind: kind.clone(),
+    //         stream: stream.clone(),
+    //         event_id: Uuid::new_v4().to_string(),
+    //         sequence: 0,
+    //         recorded_at: 0,
+    //         event_type: "init".to_string(),
+    //         payload: Value::Object(Map::new()),
+    //     };
+    //     engine.write_event(event).unwrap();
+    //     let event = Event{
+    //         space: space.clone(),
+    //         kind: kind.clone(),
+    //         stream: stream.clone(),
+    //         event_id: Uuid::new_v4().to_string(),
+    //         sequence: 1,
+    //         recorded_at: 1,
+    //         event_type: "add".to_string(),
+    //         payload: Value::Object(Map::new()),
+    //     };
+    //     engine.write_event(event).unwrap();
+    // }
 }
