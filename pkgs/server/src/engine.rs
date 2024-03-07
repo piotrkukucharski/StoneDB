@@ -28,7 +28,7 @@ struct Event {
     sequence: u64,
     recorded_at: u64,
     event_type: String,
-    payload: Value,
+    payload: Value::Object(),
 }
 
 struct Space {
@@ -152,8 +152,7 @@ impl Engine {
             let reader = Reader::with_schema(&schema, &buffer[..]).map_err(|e| e.to_string())?;
 
             for value in reader {
-                let record = value.map_err(|e| e.to_string())?;
-                events.push(record);
+                events.push(value.unwrap().resolve());
             }
         }
         if events.len() > 0{
