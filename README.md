@@ -1,5 +1,5 @@
 # StoneDB
 
-## Description
+## Description:
 
-## Architecture
+## Architecture:
