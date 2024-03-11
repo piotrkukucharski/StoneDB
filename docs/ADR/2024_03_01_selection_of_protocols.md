@@ -8,4 +8,5 @@ To communicate with a database, we need to choose a protocols, on fist I need on
 - Text protocol
 - http
 - gRPC
+- binary protocol
 
