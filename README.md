@@ -2,7 +2,7 @@
 
 ## Description:
 
-## Architecture:
+## Architecture
 
 ```shell
 > tree -I ".idea|.git|target"
