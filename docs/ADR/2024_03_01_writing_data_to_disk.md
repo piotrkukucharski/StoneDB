@@ -33,6 +33,7 @@ In the future, aggregating data will become slower, making it more challenging t
 - Apache Parquet (Column-Based)
 - CSV (Row-Based)
 - JSON
+- Json lines
 
 ### Decision
 #### Why Not Use JSON?
