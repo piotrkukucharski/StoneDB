@@ -2,10 +2,13 @@
 
 ## Description:
 
-## Architecture
+## Architecture:
+
 
 ```shell
-> tree -I ".idea|.git|target"
+tree -I ".idea|.git|target"
+```
+```text
 .
 ├── Cargo.lock
 ├── Cargo.toml
