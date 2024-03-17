@@ -3,14 +3,15 @@ use std::{fs, io};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::path::{PathBuf};
-use avro_rs::{Codec, Reader, Schema, Writer};
-use avro_rs::types::Record;
 use chrono::{DateTime, Utc};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use uuid::Uuid;
 use crate::clock::{ChronoUtcSystemClock, Clock};
 use base64::{Engine as _, engine::{general_purpose}};
 use log::kv::{Key, Source};
+use serde::{Deserialize, Serialize};
+use serde_jsonlines::{append_json_lines, json_lines, write_json_lines};
+use std::io::Result;
 
 
 type Stream = String;
@@ -28,7 +29,7 @@ struct Event {
     sequence: u64,
     recorded_at: u64,
     event_type: String,
-    payload: Value::Object(),
+    payload: Map<String, Value>,
 }
 
 struct Space {
@@ -55,8 +56,18 @@ pub struct Engine {
     spaces: HashMap<SpaceId, Space>,
 }
 
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StructureOfRecord {
+    pub event_id: String,
+    pub sequence: usize,
+    pub recorded_at: usize,
+    pub event_type: String,
+    pub payload: String
+}
+
+
 impl Engine {
-    pub fn new(configuration: EngineConfiguration) -> Result<Engine,String> {
+    pub fn new(configuration: EngineConfiguration) -> Result<Engine> {
         let mut engine = Engine { clock: ChronoUtcSystemClock, connections: HashMap::new(), configuration, spaces: HashMap::new() };
         let result = engine.init();
         match result {
@@ -65,28 +76,27 @@ impl Engine {
         }
     }
 
-    fn init(&mut self) -> Result<(), String> {
+    fn init(&mut self) -> Result<(),> {
         //create a data directory if not exist
         if !self.configuration.data_path.exists() {
-            let result = fs::create_dir(&self.configuration.data_path);
-            if result.is_err() {
-                return Err(format!("Can't create directory for path '{}'", self.configuration.data_path.to_str().unwrap()));
+            if fs::create_dir(&self.configuration.data_path).is_err(){
+                panic!("Can't create path '{}' for data", self.configuration.data_path.to_str().);
             }
         }
         //throw error if data is not directory
         if !self.configuration.data_path.is_dir() {
-            return Err(format!("Path '{}' is not a directory", self.configuration.data_path.to_str().unwrap()));
+            panic!("Path '{}' is not a directory", self.configuration.data_path.to_str().unwrap());
         }
 
         if self.scan_spaces().is_err(){
-            return Err("Can't scan spaces".to_string());
+            panic!("{}","Can't scan spaces".to_string());
         }
 
         // create a default space directory
         if !self.spaces.contains_key(&self.configuration.default_space) {
             let result = self.create_space(self.configuration.default_space.clone());
             if result.is_err(){
-                return Err(format!("Can't create space '{}'",self.configuration.default_space.clone()));
+                panic!("Can't create space '{}'",self.configuration.default_space.clone());
             }
         }
 
@@ -101,7 +111,7 @@ impl Engine {
     pub fn close_connection(&mut self, connection_id: ConnectionId) {
         self.connections.remove(&connection_id.to_string());
     }
-    fn create_space(&self, space: SpaceId) -> Result<(), std::io::Error> {
+    fn create_space(&self, space: SpaceId) -> Result<()> {
         let space_path = self.configuration.data_path.join(general_purpose::STANDARD.encode(space));
         fs::create_dir(space_path)?;
         Ok(())
@@ -128,62 +138,11 @@ impl Engine {
         Ok(())
     }
 
-    pub fn write_event(&self, event: Event) -> Result<(), String> {
-        let file_path = self.configuration.data_path.join(format!("{}/{}/{}.avro", event.space, event.kind, event.stream));
-        let raw_schema = r#"
-    {
-        "type": "record",
-        "name": "event",
-        "fields": [
-            {"name": "event_id", "type": "string"},
-            {"name": "sequence", "type": "long"},
-            {"name": "recorded_at", "type": "long"},
-            {"name": "event_type", "type": "string"},
-            {"name": "payload", "type": "string"}
-        ]
-    }
-    "#;
-        let schema = Schema::parse_str(raw_schema).map_err(|e| e.to_string())?;
+    pub fn write_event(&self, event: Event) -> Result<()> {
+        let file_path = self.configuration.data_path.join(format!("{}/{}/{}.jsonl", event.space, event.kind, event.stream));
+        let previews_records = json_lines(file_path.clone())?.collect::<Result<Vec<StructureOfRecord>>>()?;
 
-        let mut events:Vec<Record> = Vec::new();
-        if let Ok(mut file) = OpenOptions::new().read(true).open(file_path.clone()) {
-            let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
-            let reader = Reader::with_schema(&schema, &buffer[..]).map_err(|e| e.to_string())?;
-
-            for value in reader {
-                events.push(value.unwrap().resolve());
-            }
-        }
-        if events.len() > 0{
-            // if let Some(last) = events.last() {
-            //     let last_sequence = last.get(Key::from_str("sequence")).unwrap().as_long().unwrap();
-            //     if last_sequence >= event.sequence {
-            //         return Err("Sequence number is not greater than the last record".to_string());
-            //     }
-            // }
-        }
-
-        let mut record:Record<> = Record::new(&schema)?;
-        record.put("event_id", &event.event_id.to_string()?);
-        record.put("sequence", event.sequence.to_string()?);
-        record.put("recorded_at", event.recorded_at.to_string()?);
-        record.put("event_type", &event.event_type.to_string()?);
-        record.put("payload", &event.payload.to_string()?);
-
-        events.push(record);
-
-        // @TODO Change codec to snappy
-        let mut writer = Writer::with_codec(&schema, Vec::new(), Codec::Null);
-        for event in events {
-            writer.append(event).map_err(|e| e.to_string())?;
-        }
-        writer.flush().map_err(|e| e.to_string())?;
-        let encoded_data = writer.into_inner().map_err(|e| e.to_string())?;
-
-        let mut file = OpenOptions::new().write(true).create(true).open(file_path).map_err(|e| e.to_string())?;
-        file.write_all(&encoded_data).map_err(|e| e.to_string())?;
-
+        append_json_lines(file_path, vec![]);
         Ok(())
     }
 }

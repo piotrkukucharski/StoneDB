@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-avro-rs = { version = "0.13", features = ["snappy"] }
 config = "0.14.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -18,6 +17,8 @@ logos="0.14"
 chrono = {version = "0.4.34"}
 base64 = {version = "0.22.0"}
 tempdir = "0.3.7"
+serde-jsonlines = { version = "0.5" }
+
 
 [dev-dependencies]
 cucumber = "0.20.2"
