@@ -1,2 +1,3 @@
 stream = ordered list of all events for one entity or aggregate root.
+
 event = An "event" in an event store within the context of event sourcing represents a significant change in the state of a domain object or aggregate in your system. Unlike traditional CRUD (Create, Read, Update, Delete) models that track only the current state of entities, event sourcing captures each change as a series of immutable events over time. This approach enables not just viewing the current state but also how the system arrived at that state, offering powerful insights, auditing capabilities, and the option to rewind or replay the state of your application to any point in history.
