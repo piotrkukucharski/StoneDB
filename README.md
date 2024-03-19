@@ -1,4 +1,5 @@
 # StoneDB
+Event store db
 
 ## Description:
 
