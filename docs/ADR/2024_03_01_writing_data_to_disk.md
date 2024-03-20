@@ -34,6 +34,7 @@ In the future, aggregating data will become slower, making it more challenging t
 - CSV (Row-Based)
 - JSON
 - Json lines
+- 
 
 ### Decision
 #### Why Not Use JSON?
